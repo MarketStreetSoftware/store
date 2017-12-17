@@ -1,0 +1,53 @@
+# Docker compose file for running config server
+version: '2'
+services:
+  grafana:
+    image: csmiley/grafana-graphite
+    ports:
+      - "8070:80"
+      - "8071:81"
+      - "2003:2003"
+      - "2003:2003/udp"
+      - "2004:2004"
+      - "8125:8125/udp"
+      - "8126:8126"
+#    volumes_from:
+#      - dataelk
+#    depends_on:
+#      - dataelk
+    command: bash -c "ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone && /usr/bin/supervisord"
+    networks:
+      - mtrnet
+  dataelk:
+    image: busybox
+    volumes:
+      - /data
+    networks:
+      - mtrnet
+
+  dynamodb:
+    image: dwmkerr/dynamodb
+    ports:
+      - "8000:8000"
+    networks:
+      - mtrnet
+
+  store:
+    container_name: store
+    image: marketstreet/store
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - dynamo.baseUrl=http://dynamodb:8000
+      - amazon.dynamodb.endpoint=http://dynamodb:8000
+      - setup.mock=true
+    ports:
+      - "8081:8080"
+    networks:
+      - mtrnet
+    depends_on:
+      - dynamodb
+
+
+networks:
+  mtrnet:
+    driver: bridge

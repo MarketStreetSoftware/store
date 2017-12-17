@@ -1,0 +1,84 @@
+buildscript {
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath("org.springframework.boot:spring-boot-gradle-plugin:1.3.5.RELEASE")
+        classpath "se.transmode.gradle:gradle-docker:1.2"
+
+    }
+}
+
+plugins {
+    id 'java'
+}
+
+apply plugin: 'spring-boot'
+apply plugin: 'docker'
+
+
+repositories {
+    jcenter()
+}
+
+sourceSets {
+    integrationTest {
+        java {
+            compileClasspath += main.output + test.output
+            runtimeClasspath += main.output + test.output
+            srcDir file('src/integration-test/java')
+        }
+        resources.srcDir file('src/integration-test/resources')
+    }
+}
+
+configurations {
+    integrationTestCompile.extendsFrom testCompile
+    integrationTestRuntime.extendsFrom testRuntime
+}
+
+dependencies {
+    compile 'org.springframework.boot:spring-boot-starter-web'
+    compile 'com.amazonaws:aws-java-sdk-dynamodb:1.11.0'
+
+    testCompile 'org.springframework.boot:spring-boot-starter-test'
+}
+
+task integrationTest(type: Test) {
+    testClassesDir = sourceSets.integrationTest.output.classesDir
+    classpath = sourceSets.integrationTest.runtimeClasspath
+    outputs.upToDateWhen { false }
+}
+
+
+group = 'marketstreet'
+
+//java formater
+//apply plugin: 'com.github.sherter.google-java-format'
+
+task buildDocker333(type: Docker, dependsOn: build) {
+    push = true
+    applicationName = 'store'
+    dockerfile = file('src/main/docker/Dockerfile')
+    doFirst {
+        copy {
+            from jar
+            into stageDir
+        }
+    }
+}
+
+task buildDocker(type: Docker) {
+  baseImage = 'openjdk:8-jdk-alpine'
+  push = project.hasProperty('push')
+  push = false
+  tag = 'marketstreet/store'
+  addFile {
+    from jar
+    rename {'app.jar'}
+  }
+  entryPoint(['java', '-Djava.security.egd=file:/dev/./urandom', '-jar', '/app.jar'])
+  // exposePort(8080)
+}
+
+buildDocker.dependsOn(build)
